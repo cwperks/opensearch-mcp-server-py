@@ -100,6 +100,12 @@ Enable with `OPENSEARCH_ENABLED_CATEGORIES=agentic_memory`. When `memory_contain
 - [DeleteAgenticMemoryByIDTool](https://docs.opensearch.org/latest/ml-commons-plugin/api/agentic-memory-apis/delete-memory/): Deletes a specific memory by its ID.
 - [DeleteAgenticMemoryByQueryTool](https://docs.opensearch.org/latest/ml-commons-plugin/api/agentic-memory-apis/delete-memory/): Deletes multiple memories matching a query criteria.
 
+### Observability Tools (Disabled by Default)
+
+Observability tools are grouped under the `observability` category and can be enabled using `OPENSEARCH_ENABLED_CATEGORIES=observability` or by adding `enabled_categories: [observability]` to the config file. Alternatively, enable the `analytics` category to get both observability and skills tools at once.
+
+- [PPLQueryTool](https://docs.opensearch.org/latest/search-plugins/sql/ppl/index/): Executes a PPL (Piped Processing Language) query against OpenSearch. PPL provides a pipe-based syntax for querying data (`source=<index> | <command> | <command>`), supporting filtering, aggregation, sorting, deduplication, and field selection. Supports `jdbc`, `csv`, and `raw` output formats.
+
 ### Search Relevance Workbench Tools (Disabled by Default)
 Search Relevance Workbench tools are grouped under the `search_relevance` category and can be enabled at once using `OPENSEARCH_ENABLED_CATEGORIES=search_relevance` or by adding `enabled_categories: [search_relevance]` or explicitly adding individual tools to their config file. See the [Tool Filter](USER_GUIDE.md#tool-filter) section in the User Guide for additional information about how to filter tools.
 
@@ -125,10 +131,11 @@ Search Relevance Workbench tools are grouped under the `search_relevance` catego
 
 ### Skills Tools (Disabled by Default)
 
-Skills tools are grouped under the `skills` category and can be enabled at once using `OPENSEARCH_ENABLED_CATEGORIES=skills` or by adding `enabled_categories: [skills]` to the config file. See the [Tool Filter](USER_GUIDE.md#tool-filter) section in the User Guide for additional information about how to filter tools.
+Skills tools are grouped under the `skills` category and can be enabled at once using `OPENSEARCH_ENABLED_CATEGORIES=skills` or by adding `enabled_categories: [skills]` to the config file. Alternatively, enable the `analytics` category to get both skills and observability tools at once. See the [Tool Filter](USER_GUIDE.md#tool-filter) section in the User Guide for additional information about how to filter tools.
 
 - [DataDistributionTool](https://docs.opensearch.org/latest/ml-commons-plugin/agents-tools/tools/data-distribution-tool/): Analyzes data distribution patterns and field value frequencies within OpenSearch indices. Supports both single dataset analysis and comparative analysis between two time periods to identify distribution changes.
 - [LogPatternAnalysisTool](https://docs.opensearch.org/latest/ml-commons-plugin/agents-tools/tools/log-pattern-analysis-tool/): Detects anomalous log patterns and sequences through comparative analysis between baseline and selection time ranges. Supports log sequence analysis with trace correlation, log pattern difference analysis, and log insights analysis for error detection.
+- **MetricChangeAnalysisTool**: Compares percentile distributions (P50, P90) of all numeric fields between a baseline and a selection time range, then returns the top fields ranked by change score. Useful for identifying which numeric metrics shifted most during an anomaly window.
 
 ### Memory Tools (Opt-in)
 
@@ -142,7 +149,7 @@ Memory tools give the MCP agent itself persistent, cross-session memory backed b
 
 ### Tool Parameters
 
-All tools accept the following **optional connection parameters** that override the server's environment variable configuration on a per-call basis. When omitted, the server falls back to its configured environment variables or cluster config as usual.
+All tools accept the following **optional connection parameters** that override the server's environment variable configuration on a per-call basis. When all are omitted, the server uses its configured environment variables or cluster config as usual. When you supply `opensearch_url`, the credentials must come from that same call: the server will not use its own credentials against a URL a caller chose, unless the operator sets `OPENSEARCH_ALLOW_AMBIENT_AWS_FALLBACK=true` to share its AWS credentials.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -154,10 +161,10 @@ All tools accept the following **optional connection parameters** that override 
 | `aws_iam_arn` | string | IAM role ARN. Overrides `AWS_IAM_ARN`. |
 | `aws_profile` | string | AWS profile name. Overrides `AWS_PROFILE`. |
 | `aws_opensearch_serverless` | boolean | Use OpenSearch Serverless. Overrides `AWS_OPENSEARCH_SERVERLESS`. |
-| `opensearch_ssl_verify` | boolean | SSL certificate verification. Overrides `OPENSEARCH_SSL_VERIFY`. |
+| `opensearch_ssl_verify` | boolean | Set true to require SSL certificate verification. A false value is ignored, since only `OPENSEARCH_SSL_VERIFY` may disable it. |
 | `opensearch_timeout` | integer | Connection timeout in seconds. Overrides `OPENSEARCH_TIMEOUT`. |
 
-This allows agents to dynamically target different clusters per tool call without reconfiguring the server (single mode only). See [Dynamic Connection Parameters](USER_GUIDE.md#dynamic-connection-parameters) in the User Guide for details and examples.
+This allows agents to dynamically target different clusters per tool call without reconfiguring the server (single mode only). Credentials must come from the same call as the URL, unless `OPENSEARCH_ALLOW_AMBIENT_AWS_FALLBACK=true` lets the server sign caller-supplied URLs with its own AWS credentials. `OPENSEARCH_SSRF_GUARD=true` restricts caller-supplied URLs to public HTTPS addresses. See [Dynamic Connection Parameters](USER_GUIDE.md#dynamic-connection-parameters) in the User Guide for details and examples.
 
 In addition to the common connection parameters above, each tool accepts its own specific parameters:
 
@@ -342,6 +349,17 @@ In addition to the common connection parameters above, each tool accepts its own
   - `traceFieldName` (optional): Field for trace/correlation ID.
   - `baseTimeRangeStart` (optional): Start time for baseline comparison period.
   - `baseTimeRangeEnd` (optional): End time for baseline comparison period.
+
+- **MetricChangeAnalysisTool**
+
+  - `index` (required): Target OpenSearch index name.
+  - `selectionTimeRangeStart` (required): Start of the selection (anomaly) period.
+  - `selectionTimeRangeEnd` (required): End of the selection (anomaly) period.
+  - `baselineTimeRangeStart` (required): Start of the baseline period.
+  - `baselineTimeRangeEnd` (required): End of the baseline period (should be at or before `selectionTimeRangeStart`).
+  - `timeField` (required): Date/time field for filtering.
+  - `topN` (optional): Number of top fields to return, ranked by change score. Default is 10.
+  - `size` (optional): Maximum number of documents to analyze. Default is 1000.
 
 > More tools coming soon. [Click here](DEVELOPER_GUIDE.md#contributing)
 

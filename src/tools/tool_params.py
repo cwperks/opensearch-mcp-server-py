@@ -99,7 +99,7 @@ class baseToolArgs(BaseModel):
     )
     opensearch_ssl_verify: Optional[bool] = Field(
         default=None,
-        description='If false, disable SSL certificate verification.',
+        description='Set true to require SSL certificate verification. A false value is ignored, since only the operator may disable verification.',
     )
     opensearch_timeout: Optional[int] = Field(
         default=None,
@@ -685,3 +685,18 @@ class SearchExperimentsArgs(baseToolArgs):
 
     class Config:
         json_schema_extra = {'examples': _SRW_SEARCH_QUERY_BODY_EXAMPLES}
+
+
+class PplQueryArgs(baseToolArgs):
+    """Arguments for the PplQueryTool."""
+
+    query: str = Field(
+        description='The PPL (Piped Processing Language) query to execute. '
+        'PPL uses a pipe syntax: source=<index> | <command> | <command>. '
+        'Examples: "source=my_index | where status=200 | stats count() by host", '
+        '"source=logs-* | where timestamp > \'2024-01-01\' | sort - timestamp | head 20"'
+    )
+    format: str = Field(
+        default='jdbc',
+        description='Response format: "jdbc" (default, tabular JSON with schema+datarows), "csv", or "raw" (pipe-delimited text).',
+    )

@@ -7,10 +7,45 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Added
 
 - Add OAuth protected-resource support for the streaming MCP server, including bearer-token validation, scope enforcement, protected-resource metadata, and bearer-token forwarding to OpenSearch ([#98](https://github.com/opensearch-project/opensearch-mcp-server-py/issues/98))
+
+### Changed
+
+### Fixed
+
+### Removed
+
+## [Released 0.12.0]
+
+### Added
+- Expose tool category in the `_meta` field of each `Tool` object returned by `tools/list`. Core tools report `"_meta": {"category": "core_tools"}`; tools with no known category omit `_meta`. The MCP 1.x schema for `Tool` does not restrict additional properties, so this is safe for all existing clients. ([#301](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/301))
+- Add `analytics` category as a superset of `observability` (PPLQueryTool) and `skills` (DataDistributionTool, LogPatternAnalysisTool, MetricChangeAnalysisTool). All three categories are independent — `enabled_categories=skills` enables the 3 skills tools, `enabled_categories=observability` enables PPLQueryTool, and `enabled_categories=analytics` enables all 4. ([#301](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/301))
+- Support multiple datasources per request in multi mode via aligned comma-separated `opensearch-url`, `opensearch-cluster-name`, `aws-service-name`, and `aws-region` headers, discovered through `ListClustersTool` and selected per tool call by the `opensearch_cluster_name` argument (mapped to a URL server-side), signed by one shared credential; the mode can also be set via the `OPENSEARCH_MODE` env var. **Potentially breaking (multi mode + `OPENSEARCH_HEADER_AUTH=true`):** with more than one `opensearch-url`, the `opensearch-cluster-name` header is now required (no auto-generated names); a single datasource defaults to `opensearch-cluster` ([#306](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/306))
+
+### Changed
+- Upgrade `mcp[cli]` to `>=2.0.0`. Ports the server to the mcp 2.0 API: replaces removed `@server.list_tools()` / `@server.call_tool()` decorators with constructor-injected `on_list_tools` / `on_call_tool` handlers, replaces removed `request_ctx` contextvar with a local `request_context_var`, and updates renamed fields (`isError` → `is_error`, `inputSchema` → `input_schema`). Integration test client updated for the renamed `streamable_http_client` function and `httpx2`-based header/timeout configuration ([#292](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/292))
+- Mark skills category tools as read operation([#302](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/302))
+
+### Fixed
+- Bind per-call connection credentials to the caller that supplied the URL ([#287](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/287))
+- Fix CVEs by requiring `aiohttp>=3.14.3` and sync the `uv.lock` ([#294](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/294))
+- Do not advertise or run tools that OpenSearch Serverless (AOSS) cannot serve (cluster, node, and monitoring APIs such as `_cluster/health`, `_cat/nodes`, `_stats`). Serverless-incompatible tools are filtered from `tools/list` when the connection is known to be serverless and rejected at call time with a clear error otherwise. Also logs a warning instead of silently disabling version gating when the version probe fails ([#311](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/311))
+
+### Removed
+
+## [Released 0.11.0]
+
+### Added
+
 - Set MCP `CallToolResult.isError` when tool responses indicate failure (`is_error`), so clients can distinguish errors from successful tool calls ([#265](https://github.com/opensearch-project/opensearch-mcp-server-py/issues/265))
+- `ListIndexTool` now falls back to `GET /_resolve/index/*` when `_cat/indices` returns 403, allowing users with only index-level read permissions to list indices. The response is annotated when the fallback is used to indicate that health, size, and doc count are unavailable ([#279](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/279))
+- Add skills tools for root-cause analysis (`DataDistributionTool`, `LogPatternAnalysisTool`, `MetricChangeAnalysisTool`) that surface categorical value shifts, ML-clustered log patterns, and percentile changes between a baseline and an anomaly window. Skills tools are in the `skills_tools` category and can be enabled via `enabled_categories: ["skills_tools"]` ([#259](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/259))
+- Add `PPLQueryTool` for executing PPL (Piped Processing Language) queries via `/_plugins/_ppl` endpoint, with support for `jdbc`, `csv`, and `raw` output formats. Tool is in the `observability` category. ([#257](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/257))
+- Add client attribution to tool execution structured logs via optional `X-MCP-Client-Name` HTTP header. When multiple clients share a single MCP server, each client can identify itself and the `client_name` field appears in `tool_execution` log events for per-client metric filtering ([#281](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/281))
 
 ### Fixed
 - Fix Streamable HTTP `/mcp` endpoint issuing a 307 redirect to `/mcp/`, which broke strict proxies/clients that don't follow redirects mid-session. The bare `/mcp` path is now served directly via a `Route` ([#273](https://github.com/opensearch-project/opensearch-mcp-server-py/pull/273))
+- Constrain `mcp[cli]` to `>=1.9.4,<2`. The `mcp` 2.0 release removes the `@server.list_tools()` and `@server.call_tool()` decorators and the `request_ctx` contextvar that this server is built on, so an unbounded floor resolved to an incompatible major version and broke installs and CI
+- Fix CVE-2026-7246 by requiring `click>=8.3.3`, and sync the `uv.lock` project version to 0.11.0 ([#286](https://github.com/opensearch-project/opensearch-mcp-server-py/issues/286))
 
 ### Removed
 
